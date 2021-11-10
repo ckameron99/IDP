@@ -95,7 +95,33 @@ class Camera:
 
         return x1Max, y1Max, x2Min, y2Min
             
+    def getMainLine(self):
+        lower = np.uint8([0, 190, 190])
+        upper = np.uint8([255, 255, 255])
+        whiteMask = cv2.inRange(self.normalized, lower, upper)
 
+        
+        kernal = np.ones((2,2), np.uint8)
+        whiteMask = cv2.morphologyEx(whiteMask, cv2.MORPH_CLOSE, kernal, iterations=2)
+        whiteMask = cv2.morphologyEx(whiteMask, cv2.MORPH_OPEN, kernal)
+
+        lines = cv2.HoughLinesP(whiteMask,1,np.pi/180,30,minLineLength=200,maxLineGap=10)
+
+        x1Max=0
+        y1Max=0
+        x2Min=10000
+        y2Min=10000
+
+        if lines is None:
+            return 0, 0, 0, 0
+
+        for line in lines:
+            x1Max = max(x1Max, line[0][0], line[0][2])
+            y1Max = max(y1Max, line[0][1], line[0][3])
+            x2Min = min(x2Min, line[0][2], line[0][0])
+            y2Min = min(y2Min, line[0][3], line[0][1])
+
+        return x1Max, y1Max, x2Min, y2Min
 
 
 def main():
