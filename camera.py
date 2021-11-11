@@ -9,6 +9,13 @@ class Camera:
         # Versions of frames are stored as a frame, followed by a number showing what frame it was derived from
         self._frame = None, 0
         self._normalized = None, -1
+        with open("calibData.npz", "rb") as f:
+            files = np.load(f, allow_pickle=True)
+            self.ret = files["arr_0"]
+            self.mtx = files["arr_1"]
+            self.dist = files["arr_2"]
+            self.rvecs = files["arr_3"]
+            self.tvecs = files["arr_4"]
 
     def connect(self, url="http://localhost:8081/stream/video.mjpeg"):
         self.stream = cv2.VideoCapture(url)
@@ -29,8 +36,12 @@ class Camera:
     def frame(self):
         ret, frame = self.stream.read()
         if ret == True:
-            self._frame = frame, self._frame[1] + 1
-            # self.frameCallback()
+            h,  w = frame.shape[:2]
+            newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, self.dist, (w,h), 1, (w,h))
+            dst = cv2.undistort(frame, self.mtx, self.dist, None, newcameramtx)
+            x, y, w, h = roi
+            dst = dst[y-50:y+h+50, x:x+w]
+            self._frame = dst, self._frame[1] + 1
         return self._frame[0]
 
     @frame.setter
@@ -67,25 +78,29 @@ class Camera:
 
         return self._normalized[0]
 
+    @normalized.setter
+    def normalized(self, value):
+        self._normalized = value
+
     def getBarrier(self):
-        lower = np.uint8([0, 190, 190])
+        lower = np.uint8([0, 170, 170])
         upper = np.uint8([200, 255, 255])
         yellowMask = cv2.inRange(self.normalized, lower, upper)
 
         
         kernal = np.ones((2,2), np.uint8)
         yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_CLOSE, kernal, iterations=2)
-        yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_OPEN, kernal)
+        yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_OPEN, kernal, iterations=2)
 
-        lines = cv2.HoughLinesP(yellowMask,1,np.pi/180,30,minLineLength=100,maxLineGap=10)
+        lines = cv2.HoughLinesP(yellowMask,1,np.pi/500,30,minLineLength=120,maxLineGap=10)
 
         x1Max=0
         y1Max=0
         x2Min=10000
         y2Min=10000
 
-        if lines is None:
-            return 0, 0, 0, 0
+        if len(lines) == 0:
+            return 0, 1, 0, 1
 
         for line in lines:
             x1Max = max(x1Max, line[0][0], line[0][2])
@@ -96,24 +111,29 @@ class Camera:
         return x1Max, y1Max, x2Min, y2Min
             
     def getMainLine(self):
-        lower = np.uint8([0, 190, 190])
+        lower = np.uint8([200, 200, 200])
         upper = np.uint8([255, 255, 255])
         whiteMask = cv2.inRange(self.normalized, lower, upper)
 
+        lower = np.uint8([150, 150, 150])
+        upper = np.uint8([200, 200, 200])
+        darkWhiteMask = cv2.inRange(self.normalized, lower, upper)
+
+        whiteMask = whiteMask | darkWhiteMask
         
         kernal = np.ones((2,2), np.uint8)
         whiteMask = cv2.morphologyEx(whiteMask, cv2.MORPH_CLOSE, kernal, iterations=2)
         whiteMask = cv2.morphologyEx(whiteMask, cv2.MORPH_OPEN, kernal)
 
-        lines = cv2.HoughLinesP(whiteMask,1,np.pi/180,30,minLineLength=200,maxLineGap=10)
+        lines = cv2.HoughLinesP(whiteMask,1,np.pi/180,30,minLineLength=200,maxLineGap=20)
 
         x1Max=0
         y1Max=0
         x2Min=10000
         y2Min=10000
 
-        if lines is None:
-            return 0, 0, 0, 0
+        if len(lines) == 0:
+            return 0, 1, 0, 1
 
         for line in lines:
             x1Max = max(x1Max, line[0][0], line[0][2])
@@ -121,7 +141,7 @@ class Camera:
             x2Min = min(x2Min, line[0][2], line[0][0])
             y2Min = min(y2Min, line[0][3], line[0][1])
 
-        return x1Max, y1Max, x2Min, y2Min
+        return x1Max, y2Min, x2Min, y1Max
 
 
 def main():

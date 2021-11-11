@@ -134,3 +134,7 @@ slnx.sqlite
 ProjectSettings.json
 VSWorkspaceState.json
 .vs
+
+
+# calibration images
+calib*.jpg

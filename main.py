@@ -21,7 +21,7 @@ def lineIntersection(l1, l2):
     xi = (c2 - c1) / (m1 - m2)
     yi = m1 * xi + c1
 
-    return xi, yi
+    return int(xi), int(yi)
 
 def main():
     c = Camera()
@@ -30,11 +30,20 @@ def main():
     cv2.imshow("normal", c.normalized)
     cv2.setMouseCallback('normal',c.mouseRGB)
     while True:
-        cv2.imshow("normal", c.normalized)
-        center = lineIntersection([c.getBarrier()], [c.getMainLine()])
-        cv2.circle(c.normalized, center, radius=0, color=(0,0,255), thickness=1)
-        # x1Max, y1Max, x2Min, y2Min = c.getBarrier()
-        #cv2.line(c.normalized,(x1Max,y1Max),(x2Min,y2Min),(255,0,0),1)
+        
+        barrier = c.getBarrier()
+        #print(barrier)
+        mainLine = c.getMainLine()
+        center = lineIntersection(barrier, mainLine)
+        #print(center)
+        n = c.normalized.copy()
+        cv2.circle(n, center, radius=0, color=(0,0,255), thickness=15)
+        
+        
+        cv2.line(n,barrier[:2],barrier[2:],(255,0,0),5)
+        cv2.line(n,mainLine[:2],mainLine[2:],(255,0,0),5)
+        cv2.imshow("normal", n)
+        
         keya = cv2.waitKey(1)
         if keya == 27:
             exit()
