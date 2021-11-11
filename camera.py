@@ -111,9 +111,6 @@ class Camera:
         yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_CLOSE, kernal, iterations=2)
         yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_OPEN, kernal, iterations=2)
 
-        cv2.imshow("mask",yellowMask)
-        cv2.waitKey(1)
-
         lines = cv2.HoughLinesP(yellowMask,1,np.pi/500,30,minLineLength=120,maxLineGap=10)
 
         x1Max=0
@@ -133,15 +130,12 @@ class Camera:
         return x1Max, y1Max, x2Min, y2Min
             
     def getMainLine(self):
-        lower = np.uint8([200, 200, 200])
-        upper = np.uint8([255, 255, 255])
-        whiteMask = cv2.inRange(self.normalized, lower, upper)
+        lower = np.uint8([150, 125, 125])
+        upper = np.uint8([255, 135, 135])
+        whiteMask = cv2.inRange(self.ycrcbNormalized, lower, upper)
 
-        lower = np.uint8([150, 150, 150])
-        upper = np.uint8([200, 200, 200])
-        darkWhiteMask = cv2.inRange(self.normalized, lower, upper)
-
-        whiteMask = whiteMask | darkWhiteMask
+        cv2.imshow("whiteMask", whiteMask)
+        cv2.waitKey(1)
         
         kernal = np.ones((2,2), np.uint8)
         whiteMask = cv2.morphologyEx(whiteMask, cv2.MORPH_CLOSE, kernal, iterations=2)
@@ -154,7 +148,7 @@ class Camera:
         x2Min=10000
         y2Min=10000
 
-        if len(lines) == 0:
+        if lines is None:
             return 0, 1, 0, 1
 
         for line in lines:
