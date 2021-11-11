@@ -9,6 +9,8 @@ class Camera:
         # Versions of frames are stored as a frame, followed by a number showing what frame it was derived from
         self._frame = None, 0
         self._normalized = None, -1
+        self._ycrcb = None, -1
+        self._ycrcbNormalized = None, -1
         with open("calibData.npz", "rb") as f:
             files = np.load(f, allow_pickle=True)
             self.ret = files["arr_0"]
@@ -54,15 +56,20 @@ class Camera:
         self._frame[0] = value
 
     @property
-    def normalized(self):
+    def ycrcb(self):
+        if self._ycrcb[1] == self._frame[1]:
+            return self._ycrcb[0]
+        self._ycrcb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2YCrCb), self._frame[1]
+        return self._ycrcb[0]
+
+    @property
+    def ycrcbNormalized(self):
         hh, ww = self.frame.shape[:2]
         if self._normalized[1] == self._frame[1]:
             return self._normalized[0]
         mx = max(hh, ww)
 
-        ycrcb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2YCrCb)
-
-        y, cr, cb = cv2.split(ycrcb)
+        y, cr, cb = cv2.split(self.ycrcb)
 
         sigma = int(5 * mx / 300)
 
@@ -77,9 +84,16 @@ class Camera:
 
         y = y.astype("uint8")
 
-        ycrcb = cv2.merge([y, cr, cb])
+        self._ycrcbNormalized = cv2.merge([y, cr, cb]), self._frame[1]
+        return self._ycrcbNormalized[0]
 
-        self._normalized = cv2.cvtColor(ycrcb, cv2.COLOR_YCR_CB2BGR), self._frame[1]
+    @property
+    def normalized(self):
+        hh, ww = self.frame.shape[:2]
+        if self._normalized[1] == self._frame[1]:
+            return self._normalized[0]
+
+        self._normalized = cv2.cvtColor(self.ycrcbNormalized, cv2.COLOR_YCR_CB2BGR), self._frame[1]
 
         return self._normalized[0]
 
