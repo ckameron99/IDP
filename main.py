@@ -26,11 +26,11 @@ def lineIntersection(l1, l2):
 def main():
     c = Camera()
     c.connect()
-
+    c.updateFrame()
     cv2.imshow("normal", c.normalized)
     cv2.setMouseCallback('normal',c.mouseRGB)
     while True:
-        
+        c.updateFrame()
         barrier = c.getBarrier()
         #print(barrier)
         mainLine = c.getMainLine()

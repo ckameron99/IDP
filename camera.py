@@ -34,6 +34,9 @@ class Camera:
 
     @property
     def frame(self):
+        return self._frame[0]
+        
+    def updateFrame(self):
         ret, frame = self.stream.read()
         if ret == True:
             h,  w = frame.shape[:2]
