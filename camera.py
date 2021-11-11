@@ -102,14 +102,17 @@ class Camera:
         self._normalized = value
 
     def getBarrier(self):
-        lower = np.uint8([0, 170, 170])
-        upper = np.uint8([200, 255, 255])
-        yellowMask = cv2.inRange(self.normalized, lower, upper)
+        lower = np.uint8([130, 125, 50])
+        upper = np.uint8([255, 140, 120])
+        yellowMask = cv2.inRange(self.ycrcbNormalized, lower, upper)
 
         
         kernal = np.ones((2,2), np.uint8)
         yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_CLOSE, kernal, iterations=2)
         yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_OPEN, kernal, iterations=2)
+
+        cv2.imshow("mask",yellowMask)
+        cv2.waitKey(1)
 
         lines = cv2.HoughLinesP(yellowMask,1,np.pi/500,30,minLineLength=120,maxLineGap=10)
 
