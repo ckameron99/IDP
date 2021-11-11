@@ -26,6 +26,8 @@ class Camera:
             colorsG = self._normalized[0][y,x,1]
             colorsR = self._normalized[0][y,x,2]
             colors = self._normalized[0][y,x]
+            ycrcb = cv2.cvtColor(self.normalized, cv2.COLOR_BGR2YCrCb)
+            print("ycrcb: ", ycrcb[y,x])
             print("Red: ",colorsR)
             print("Green: ",colorsG)
             print("Blue: ",colorsB)
@@ -35,7 +37,7 @@ class Camera:
     @property
     def frame(self):
         return self._frame[0]
-        
+
     def updateFrame(self):
         ret, frame = self.stream.read()
         if ret == True:
@@ -49,7 +51,7 @@ class Camera:
 
     @frame.setter
     def frame(self, value):
-        self._frame = value
+        self._frame[0] = value
 
     @property
     def normalized(self):

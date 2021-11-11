@@ -7,6 +7,7 @@ import time
 c = Camera()
 c.connect()
 for i in range(0):
+    c.updateFrame()
     cv.imshow("calib",c.frame)
     cv.waitKey(1)
     print(i)

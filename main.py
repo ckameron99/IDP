@@ -36,13 +36,12 @@ def main():
         mainLine = c.getMainLine()
         center = lineIntersection(barrier, mainLine)
         #print(center)
-        n = c.normalized.copy()
-        cv2.circle(n, center, radius=0, color=(0,0,255), thickness=15)
+        cv2.circle(c.normalized, center, radius=0, color=(0,0,255), thickness=15)
         
         
-        cv2.line(n,barrier[:2],barrier[2:],(255,0,0),5)
-        cv2.line(n,mainLine[:2],mainLine[2:],(255,0,0),5)
-        cv2.imshow("normal", n)
+        #cv2.line(c.normalized,barrier[:2],barrier[2:],(255,0,0),5)
+        #cv2.line(c.normalized,mainLine[:2],mainLine[2:],(255,0,0),5)
+        cv2.imshow("normal", c.normalized)
         
         keya = cv2.waitKey(1)
         if keya == 27:
