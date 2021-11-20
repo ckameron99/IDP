@@ -11,6 +11,8 @@ class Camera:
         self._normalized = None, -1
         self._ycrcb = None, -1
         self._ycrcbNormalized = None, -1
+        self._hsv = None, -1
+        self._cropped = None, -1
         with open("calibData.npz", "rb") as f:
             files = np.load(f, allow_pickle=True)
             self.ret = files["arr_0"]
@@ -41,8 +43,15 @@ class Camera:
         return self._frame[0]
 
     def updateFrame(self):
-        ret, frame = self.stream.read()
-        if ret == True:
+        '''ret = True
+        while ret:
+            ret = self.stream.grab()
+        ret, frame = self.stream.retrieve()
+        print("newframe")'''
+        for i in range(4):
+            ret = self.stream.grab()
+        ret, frame = self.stream.retrieve()
+        if ret:
             h,  w = frame.shape[:2]
             newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, self.dist, (w,h), 1, (w,h))
             dst = cv2.undistort(frame, self.mtx, self.dist, None, newcameramtx)
@@ -54,6 +63,13 @@ class Camera:
     @frame.setter
     def frame(self, value):
         self._frame[0] = value
+
+    @property
+    def hsv(self):
+        if self._hsv[1] == self._frame[1]:
+            return self._hsv[0]
+        self._hsv = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV), self._frame[1]
+        return self._hsv[0]
 
     @property
     def ycrcb(self):
@@ -101,6 +117,43 @@ class Camera:
     def normalized(self, value):
         self._normalized = value
 
+    def four_point_transform(self, image, pts):
+        # obtain a consistent order of the points and unpack them
+        # individually
+        pts = np.array(pts, dtype="float32")
+        (tl, tr, br, bl) = pts
+
+        # compute the width of the new image, which will be the
+        # maximum distance between bottom-right and bottom-left
+        # x-coordiates or the top-right and top-left x-coordinates
+        widthA = np.sqrt(((br[0] - bl[0]) ** 2) + ((br[1] - bl[1]) ** 2))
+        widthB = np.sqrt(((tr[0] - tl[0]) ** 2) + ((tr[1] - tl[1]) ** 2))
+        maxWidth = max(int(widthA), int(widthB))
+
+        # compute the height of the new image, which will be the
+        # maximum distance between the top-right and bottom-right
+        # y-coordinates or the top-left and bottom-left y-coordinates
+        heightA = np.sqrt(((tr[0] - br[0]) ** 2) + ((tr[1] - br[1]) ** 2))
+        heightB = np.sqrt(((tl[0] - bl[0]) ** 2) + ((tl[1] - bl[1]) ** 2))
+        maxHeight = max(int(heightA), int(heightB))
+
+        # now that we have the dimensions of the new image, construct
+        # the set of destination points to obtain a "birds eye view",
+        # (i.e. top-down view) of the image, again specifying points
+        # in the top-left, top-right, bottom-right, and bottom-left
+        # order
+        dst = np.array([
+            [0, 0],
+            [maxWidth - 1, 0],
+            [maxWidth - 1, maxHeight - 1],
+            [0, maxHeight - 1]], dtype = "float32")
+
+        # compute the perspective transform matrix and then apply it
+        M = cv2.getPerspectiveTransform(pts, dst)
+        warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+        warped = cv2.resize(warped, (600, 600), interpolation=cv2.INTER_AREA)
+        self.arena = warped
+
     def getBarrier(self):
         lower = np.uint8([130, 125, 50])
         upper = np.uint8([255, 140, 120])
@@ -133,9 +186,6 @@ class Camera:
         lower = np.uint8([150, 125, 125])
         upper = np.uint8([255, 135, 135])
         whiteMask = cv2.inRange(self.ycrcbNormalized, lower, upper)
-
-        cv2.imshow("whiteMask", whiteMask)
-        cv2.waitKey(1)
         
         kernal = np.ones((2,2), np.uint8)
         whiteMask = cv2.morphologyEx(whiteMask, cv2.MORPH_CLOSE, kernal, iterations=2)
@@ -167,6 +217,7 @@ def main():
     cv2.imshow("normal", c.normalized)
     cv2.setMouseCallback('normal',c.mouseRGB)
     while True:
+        print(int(c.stream.get(cv2.CAP_PROP_FRAME_COUNT)))
         cv2.imshow("normal", c.normalized)
         x1Max, y1Max, x2Min, y2Min = c.getBarrier()
         #cv2.line(c.normalized,(x1Max,y1Max),(x2Min,y2Min),(255,0,0),1)
