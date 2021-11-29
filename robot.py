@@ -80,6 +80,8 @@ class Robot:
             print(instrumentalDestination)
 
         orientation = [y2 - y1, x2 - x1]
+        if self.returning:
+            orientation = [-dir for dir in orientation]
         print(f"orientation: {orientation}")
         direction = [ya - instrumentalDestination[1], xa - instrumentalDestination[0]]
         print(f"direction: {direction}")
@@ -105,6 +107,8 @@ class Robot:
         rPower /= maxPower/255
         lPower = int(lPower)
         rPower = int(rPower)
+        if self.returning:
+            lPower, rPower = -rPower, -rPower
         print(lPower, rPower)
         self.commands.append(f"{lPower:+04}{rPower:+04}")
         self.lastCommandTime = time.time()
