@@ -62,7 +62,7 @@ class Robot:
             finalDestination = self.beacons[i]
             print(f"final desination: {finalDestination}")
             print(xa, ya)
-            if ((xa-300)**2 + (ya-300)**2)**0.5 < 160 and abs(xa+ya-600)<40:
+            if ((xa-300)**2 + (ya-300)**2)**0.5 < 160 and abs(xa+ya-600)<40 and ya - xa > 180:
                 instrumentalDestination = (200,400)
             elif xa - ya > 0:
                 instrumentalDestination = (400,200)
@@ -71,7 +71,7 @@ class Robot:
             print(instrumentalDestination)
         else:
             finalDestination = (520, 80)
-            if ((xa-300)**2 + (ya-300)**2)**0.5 < 160 and abs(xa+ya-600)<40:
+            if ((xa-300)**2 + (ya-300)**2)**0.5 < 160 and abs(xa+ya-600)<40 and ya - xa < -180:
                 instrumentalDestination = (400,200)
             elif xa - ya < 0:
                 instrumentalDestination = (200,400)
