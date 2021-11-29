@@ -7,12 +7,16 @@ import time
 class Camera:
     def __init__(self):
         # Versions of frames are stored as a frame, followed by a number showing what frame it was derived from
+        self.stream = None
         self._frame = None, 0
         self._normalized = None, -1
         self._ycrcb = None, -1
         self._ycrcbNormalized = None, -1
         self._hsv = None, -1
         self._cropped = None, -1
+        self._arena = None, -1
+        self._hsvArena = None, -1
+        self.latestFrame = None
         with open("calibData.npz", "rb") as f:
             files = np.load(f, allow_pickle=True)
             self.ret = files["arr_0"]
@@ -20,9 +24,20 @@ class Camera:
             self.dist = files["arr_2"]
             self.rvecs = files["arr_3"]
             self.tvecs = files["arr_4"]
+        self.t = threading.Thread(target=self.frameDaemon, daemon=True)
+
+    def frameDaemon(self):
+        while True:
+            time.sleep(0.0001)
+            ret = self.stream.grab()
+            ret, frame = self.stream.retrieve()
+            if ret:
+                self.latestFrame = frame
 
     def connect(self, url="http://localhost:8081/stream/video.mjpeg"):
         self.stream = cv2.VideoCapture(url)
+        self.t.start()
+        time.sleep(1)
 
     def mouseRGB(self,event,x,y,flags,param):
         if event == cv2.EVENT_LBUTTONDOWN: #checks mouse left button down condition
@@ -38,6 +53,18 @@ class Camera:
             print("BRG Format: ",colors)
             print("Coordinates of pixel: X: ",x,"Y: ",y)
 
+    def mouseHSV(self,event,x,y,flags,param):
+        if event == cv2.EVENT_LBUTTONDOWN: #checks mouse left button down condition
+            colorsH = self.hsvArena[y,x,0]
+            colorsS = self.hsvArena[y,x,1]
+            colorsV = self.hsvArena[y,x,2]
+            colors = self.hsvArena[y,x]
+            print("Hue: ",colorsH)
+            print("Saturation: ",colorsS)
+            print("Value: ",colorsV)
+            print("HSV Format: ",colors)
+            print("Coordinates of pixel: X: ",x,"Y: ",y)
+
     @property
     def frame(self):
         return self._frame[0]
@@ -48,16 +75,13 @@ class Camera:
             ret = self.stream.grab()
         ret, frame = self.stream.retrieve()
         print("newframe")'''
-        for i in range(4):
-            ret = self.stream.grab()
-        ret, frame = self.stream.retrieve()
-        if ret:
-            h,  w = frame.shape[:2]
-            newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, self.dist, (w,h), 1, (w,h))
-            dst = cv2.undistort(frame, self.mtx, self.dist, None, newcameramtx)
-            x, y, w, h = roi
-            dst = dst[y-50:y+h+50, x:x+w]
-            self._frame = dst, self._frame[1] + 1
+        frame = self.latestFrame.copy()
+        h,  w = frame.shape[:2]
+        newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, self.dist, (w,h), 1, (w,h))
+        dst = cv2.undistort(frame, self.mtx, self.dist, None, newcameramtx)
+        x, y, w, h = roi
+        dst = dst[y-50:y+h+50, x:x+w]
+        self._frame = dst, self._frame[1] + 1
         return self._frame[0]
 
     @frame.setter
@@ -150,13 +174,60 @@ class Camera:
 
         # compute the perspective transform matrix and then apply it
         M = cv2.getPerspectiveTransform(pts, dst)
+        t = time.time()
         warped = cv2.warpPerspective(image, M, (maxWidth, maxHeight))
+        #print(f"warp: {time.time() -t}")
         warped = cv2.resize(warped, (600, 600), interpolation=cv2.INTER_AREA)
-        self.arena = warped
+        #print(f"resize: {time.time()-t}")
+        self._arena = warped, self._frame[1]
+
+    @property
+    def arena(self):
+        return self._arena[0]
+
+    @property
+    def hsvArena(self):
+        if self._hsvArena[1] == self._arena[1]:
+            return self._hsvArena[0]
+        self._hsvArena = cv2.cvtColor(self.arena, cv2.COLOR_BGR2HSV), self._arena[1]
+        return self._hsvArena[0]
+
+    def getBeacons(self):
+        lower = np.uint8([33, 25, 175])
+        upper = np.uint8([70, 85, 255])
+        mask = cv2.inRange(self.hsvArena, lower, upper)
+        
+        kernal = np.ones((2,2), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernal, iterations=2)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernal, iterations=2)
+
+        try:
+            points = cv2.findNonZero(mask).tolist()
+        except:
+            points = []
+
+        groups = {}
+        group = 0
+        while len(points) > 1:
+            group += 1
+            groups[group] = []
+            ref = points.pop(0)
+            for i, point in enumerate(points):
+                distance = ((point[0][0]-ref[0][0])**2 + (point[0][1]-ref[0][1])**2)**0.5
+                if distance < 30:
+                    groups[group].append(points[i][0])
+                    points[i] = None
+            points = list(filter(lambda x: x is not None, points))
+        try:
+            return list([[int(np.mean(list([x[0] for x in groups[arr]]))), int(np.mean(list([x[1] for x in groups[arr]])))] for arr in groups])
+        except ValueError:
+            return []
+
+        cv2.imshow("mask", mask)
 
     def getBarrier(self):
-        lower = np.uint8([130, 125, 50])
-        upper = np.uint8([255, 140, 120])
+        lower = np.uint8([130, 125, 35])
+        upper = np.uint8([255, 145, 120])
         yellowMask = cv2.inRange(self.ycrcbNormalized, lower, upper)
 
         
@@ -171,7 +242,7 @@ class Camera:
         x2Min=10000
         y2Min=10000
 
-        if len(lines) == 0:
+        if lines is None or len(lines) == 0:
             return 0, 1, 0, 1
 
         for line in lines:
