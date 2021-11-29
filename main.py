@@ -21,6 +21,12 @@ def genLine(m, r):
     y = r * math.sin(theta)
     return np.array([int(x), int(y)])
 
+def genLine2(dir, r):
+    theta = math.atan2(dir[1], dir[0])
+    x = r * math.cos(theta)
+    y = r * math.sin(theta)
+    return np.array([int(x), int(y)])
+
 def lineIntersection(l1, l2):
     # lines should be given in the format x1, y1, x2, y2
     # calculate the gradients
@@ -66,10 +72,12 @@ def main():
     t1, t2 = timer(t1, t2)
     center = lineIntersection(barrier, mainLine)
     corners = []
-    corners.append(center + genLine(gradient(barrier), -350))
-    corners.append(center + genLine(1/gradient(mainLine), -350))
-    corners.append(center + genLine(gradient(barrier), 350))
-    corners.append(center + genLine(1/gradient(mainLine), 350))
+    barrierDir = [barrier[2]-barrier[0], barrier[3]-barrier[1]]
+    mainLineDir = [mainLine[2]-mainLine[0], mainLine[3]-mainLine[1]]
+    corners.append(center + genLine2(barrierDir, -350))
+    corners.append(center + genLine2(mainLineDir, -350))
+    corners.append(center + genLine2(barrierDir, 350))
+    corners.append(center + genLine2(mainLineDir, 350))
     corners = np.array(corners)
     for i in range(10):
         c.updateFrame()
@@ -78,10 +86,12 @@ def main():
         center = lineIntersection(barrier, mainLine)
         oldCorners = corners.copy()
         corners = []
-        corners.append(center + genLine(gradient(barrier), -350))
-        corners.append(center + genLine(1/gradient(mainLine), -350))
-        corners.append(center + genLine(gradient(barrier), 350))
-        corners.append(center + genLine(1/gradient(mainLine), 350))
+        barrierDir = [barrier[2]-barrier[0], barrier[3]-barrier[1]]
+        mainLineDir = [mainLine[2]-mainLine[0], mainLine[3]-mainLine[1]]
+        corners.append(center + genLine2(barrierDir, -350))
+        corners.append(center + genLine2(mainLineDir, -350))
+        corners.append(center + genLine2(barrierDir, 350))
+        corners.append(center + genLine2(mainLineDir, 350))
         corners = np.array(corners)
         corners = 0.2*corners + 0.8*oldCorners
         #print("got more lines")
@@ -114,8 +124,10 @@ def main():
         
 
         
-        '''for corner in corners:
-            cv2.circle(c.frame, corner, radius=0, color=(0,255,0), thickness=5)'''
+        for corner in corners:
+            corner = [int(e) for e in corner]
+            cv2.circle(c.frame, corner, radius=0, color=(0,255,0), thickness=5)
+        #cv2.imshow("frame", c.frame)
         #print(center)
         #cv2.circle(c.frame, center, radius=0, color=(0,0,255), thickness=15)
         grey = cv2.cvtColor(c.arena, cv2.COLOR_BGR2GRAY)
@@ -134,7 +146,7 @@ def main():
             ]
             cv2.circle(c.arena, front, radius=0, color=(0,0,255), thickness=5)
             cv2.circle(c.arena, back, radius=0, color=(0,255,0), thickness=5)
-            if time.time() - r.lastCommandTime > 0.3:
+            if time.time() - r.lastCommandTime > 0.3 and 0:
                 print("calculating pos")
                 r.computeMotors(front[0], front[1], back[0], back[1])
                 print("computed motors")
@@ -164,6 +176,8 @@ def main():
         if keya == 27:
             r.commands.append("stop")
             r.lastCommandTime = time.time()
+            cv2.destroyAllWindows()
+            time.sleep(1)
             exit()
         if keya == 115:
             r.commands.append("start")

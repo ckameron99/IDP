@@ -12,7 +12,13 @@ class Robot:
             (0,0),
             (0,0)
         ]
+        self.dropOffLocations = {
+            "1": (80, 520),
+            "2": (450, 200),
+            "3": (400, 150)
+        }
         self.returning = False
+        self.beaconID = None
     
     def connect(self, IPAddr, IPPort, MACAddr, MACPort):
         #self.bts = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
@@ -39,6 +45,9 @@ class Robot:
                 d = conn.recv(1024)  # should be b'test'
                 print(d)
                 while True:
+                    if self.commands == ["approach"]:
+                        conn.sendall(b"approach")
+                        self.beaconID = conn.recv(1024).decode("utf-8")
                     if self.commands != []:
                         conn.sendall(self.commands.pop(0).encode("utf-8"))
                     time.sleep(0.001)
@@ -50,38 +59,41 @@ class Robot:
         print("computing motors")
         print(f"beacons: {self.beacons}")
         i = 0
-        while i<len(self.beacons) and self.beacons[i][0]-self.beacons[i][1] > 0:
-            print(self.beacons)
-            print(self.beacons[i])
-            i+=1
+        for j, beacon in enumerate(self.beacons):
+            if abs(sum(beacon) - 600) < 40:
+                i = j
         if i == len(self.beacons):
             print("all beacons on other side")
             return
 
+        orientation = [y2 - y1, x2 - x1]
+        reversing = False
         if not self.returning:
             finalDestination = self.beacons[i]
             print(f"final desination: {finalDestination}")
             print(xa, ya)
-            if ((xa-300)**2 + (ya-300)**2)**0.5 < 160 and abs(xa+ya-600)<40 and ya - xa > 180:
-                instrumentalDestination = (200,400)
+            if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa < 220:
+                instrumentalDestination = (175,425)
             elif xa - ya > 0:
-                instrumentalDestination = (400,200)
+                instrumentalDestination = (425,175)
             else:
                 instrumentalDestination = finalDestination
             print(instrumentalDestination)
         else:
-            finalDestination = (520, 80)
-            if ((xa-300)**2 + (ya-300)**2)**0.5 < 160 and abs(xa+ya-600)<40 and ya - xa < -180:
-                instrumentalDestination = (400,200)
+            finalDestination = self.dropOffLocations[self.beaconID]
+            if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa > -220:
+                instrumentalDestination = (425,175)
             elif xa - ya < 0:
-                instrumentalDestination = (200,400)
+                instrumentalDestination = (175,425)
+                orientation = [-dir for dir in orientation]
+                reversing = True
             else:
                 instrumentalDestination = finalDestination
             print(instrumentalDestination)
 
-        orientation = [y2 - y1, x2 - x1]
-        if self.returning:
-            orientation = [-dir for dir in orientation]
+        
+
+            
         print(f"orientation: {orientation}")
         direction = [ya - instrumentalDestination[1], xa - instrumentalDestination[0]]
         print(f"direction: {direction}")
@@ -107,8 +119,8 @@ class Robot:
         rPower /= maxPower/255
         lPower = int(lPower)
         rPower = int(rPower)
-        if self.returning:
-            lPower, rPower = -rPower, -rPower
+        if reversing:
+            lPower, rPower = -rPower, -lPower
         print(lPower, rPower)
         self.commands.append(f"{lPower:+04}{rPower:+04}")
         self.lastCommandTime = time.time()

@@ -34,7 +34,7 @@ class Camera:
             if ret:
                 self.latestFrame = frame
 
-    def connect(self, url="http://localhost:8081/stream/video.mjpeg"):
+    def connect(self, url="http://localhost:8082/stream/video.mjpeg"):
         self.stream = cv2.VideoCapture(url)
         self.t.start()
         time.sleep(1)
@@ -223,17 +223,57 @@ class Camera:
         except ValueError:
             return []
 
-        cv2.imshow("mask", mask)
+        #cv2.imshow("mask", mask)
 
     def getBarrier(self):
-        lower = np.uint8([130, 125, 35])
-        upper = np.uint8([255, 145, 120])
-        yellowMask = cv2.inRange(self.ycrcbNormalized, lower, upper)
+        return self.getBarrierhsv()
+
+    def getBarrierhsv(self):
+        lower = np.uint8([25, 50, 200])
+        upper = np.uint8([35, 180, 255])
+        yellowMask = cv2.inRange(self.hsv, lower, upper)
+
+        #cv2.imshow("mask",yellowMask)
 
         
         kernal = np.ones((2,2), np.uint8)
         yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_CLOSE, kernal, iterations=2)
         yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_OPEN, kernal, iterations=2)
+
+        #cv2.imshow("mask2", yellowMask)
+
+        lines = cv2.HoughLinesP(yellowMask,1,np.pi/500,30,minLineLength=120,maxLineGap=10)
+
+        x1Max=0
+        y1Max=0
+        x2Min=10000
+        y2Min=10000
+
+        if lines is None or len(lines) == 0:
+            return 0, 1, 0, 1
+
+        for line in lines:
+            x1Max = max(x1Max, line[0][0], line[0][2])
+            y1Max = max(y1Max, line[0][1], line[0][3])
+            x2Min = min(x2Min, line[0][2], line[0][0])
+            y2Min = min(y2Min, line[0][3], line[0][1])
+
+        return x1Max, y1Max, x2Min, y2Min
+    
+    def getBarrierycrcb(self):
+        # no longer in use
+        lower = np.uint8([130, 125, 35])
+        upper = np.uint8([255, 145, 120])
+        yellowMask = cv2.inRange(self.ycrcbNormalized, lower, upper)
+
+        #cv2.imshow("mask",yellowMask)
+
+        
+        kernal = np.ones((2,2), np.uint8)
+        yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_CLOSE, kernal, iterations=2)
+        yellowMask = cv2.morphologyEx(yellowMask, cv2.MORPH_OPEN, kernal, iterations=2)
+
+        #cv2.imshow("mask2", yellowMask)
 
         lines = cv2.HoughLinesP(yellowMask,1,np.pi/500,30,minLineLength=120,maxLineGap=10)
 
