@@ -193,7 +193,7 @@ class Camera:
         return self._hsvArena[0]
 
     def getBeacons(self):
-        lower = np.uint8([33, 25, 175])
+        lower = np.uint8([34, 25, 175])
         upper = np.uint8([70, 85, 255])
         mask = cv2.inRange(self.hsvArena, lower, upper)
         

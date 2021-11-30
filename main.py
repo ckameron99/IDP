@@ -53,7 +53,7 @@ def timer(t1, t2):
 def main():
     t1, t2 = time.time(), time.time()
     r = Robot()
-    r.connect("192.168.137.1", 8081, "", "")
+    r.connect("192.168.137.1", 8081, "A8-7E-EA-C7-E7-27")
 
 
     c = Camera()

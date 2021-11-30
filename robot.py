@@ -15,16 +15,17 @@ class Robot:
         self.dropOffLocations = {
             "1": (80, 520),
             "2": (450, 200),
-            "3": (400, 150)
+            "3": (400, 150),
+            "0": (565, 45)
         }
         self.returning = False
         self.beaconID = None
     
-    def connect(self, IPAddr, IPPort, MACAddr, MACPort):
+    def connect(self, IPAddr, IPPort, MACAddr):
         #self.bts = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
         self.ips = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-        #self.bts.bind((MACAddr, MACPort))
+        #self.bts.bind((socket.BDADDR_ANY, 0))
         self.ips.bind((IPAddr, IPPort))
 
         #self.bts.listen()
@@ -68,7 +69,18 @@ class Robot:
 
         orientation = [y2 - y1, x2 - x1]
         reversing = False
-        if not self.returning:
+        if len(self.beacons) == 0:
+            finalDestination = self.dropOffLocations["0"]
+            print(f"final desination: {finalDestination}")
+            print(xa, ya)
+            if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa < 220:
+                instrumentalDestination = (175,425)
+            elif xa - ya > 0:
+                instrumentalDestination = (425,175)
+            else:
+                instrumentalDestination = finalDestination
+            print(instrumentalDestination)
+        elif not self.returning:
             finalDestination = self.beacons[i]
             print(f"final desination: {finalDestination}")
             print(xa, ya)
@@ -102,7 +114,7 @@ class Robot:
 
         distance = (directionToFinal[0]**2 + directionToFinal[1]**2)**0.5
 
-        if distance < 95:
+        if distance < 95 and self.returning:
             print("begun approach")
             #self.commands.append("approach")
             self.lastCommandTime = time.time()
