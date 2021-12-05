@@ -2,16 +2,13 @@ import threading
 import socket
 import math
 import time
+import atexit
 
 
 class Robot:
     def __init__(self):
         self.commands = []
-        self.beacons = [
-            (0,0),
-            (0,0),
-            (0,0)
-        ]
+        self.beacons = []
         self.dropOffLocations = {
             "1": (80, 520),
             "2": (450, 200),
@@ -30,6 +27,8 @@ class Robot:
 
         #self.bts.listen()
         self.ips.listen()
+
+        atexit.register(self.ips.close)
         
         self.t = threading.Thread(target=self.IPDaemon, daemon=True)
         self.t.start()
@@ -46,9 +45,6 @@ class Robot:
                 d = conn.recv(1024)  # should be b'test'
                 print(d)
                 while True:
-                    if self.commands == ["approach"]:
-                        conn.sendall(b"approach")
-                        self.beaconID = conn.recv(1024).decode("utf-8")
                     if self.commands != []:
                         conn.sendall(self.commands.pop(0).encode("utf-8"))
                     time.sleep(0.001)
@@ -69,7 +65,12 @@ class Robot:
 
         orientation = [y2 - y1, x2 - x1]
         reversing = False
-        if len(self.beacons) == 0:
+
+        if self.returning:
+            reversing = True
+            instrumentalDestination, finalDestination = (175,425), (175,425)
+            print(instrumentalDestination)
+        elif len(self.beacons) == 0:
             finalDestination = self.dropOffLocations["0"]
             print(f"final desination: {finalDestination}")
             print(xa, ya)
@@ -80,7 +81,7 @@ class Robot:
             else:
                 instrumentalDestination = finalDestination
             print(instrumentalDestination)
-        elif not self.returning:
+        else:
             finalDestination = self.beacons[i]
             print(f"final desination: {finalDestination}")
             print(xa, ya)
@@ -91,17 +92,7 @@ class Robot:
             else:
                 instrumentalDestination = finalDestination
             print(instrumentalDestination)
-        else:
-            finalDestination = self.dropOffLocations[self.beaconID]
-            if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa > -220:
-                instrumentalDestination = (425,175)
-            elif xa - ya < 0:
-                instrumentalDestination = (175,425)
-                orientation = [-dir for dir in orientation]
-                reversing = True
-            else:
-                instrumentalDestination = finalDestination
-            print(instrumentalDestination)
+            
 
         
 
@@ -114,12 +105,18 @@ class Robot:
 
         distance = (directionToFinal[0]**2 + directionToFinal[1]**2)**0.5
 
-        if distance < 95 and self.returning:
+        if distance < 95 and not self.returning:
             print("begun approach")
-            #self.commands.append("approach")
+            self.commands.append("approach")
             self.lastCommandTime = time.time()
             self.beacons.pop(i)
             self.returning = True
+            return
+        elif distance < 50:
+            self.returning = False
+            if len(self.beacons) == 0:
+                self.commands.append("+000+000")
+                exit()
             return
 
         error = math.atan2(*direction) - math.atan2(*orientation)

@@ -98,7 +98,15 @@ def main():
         t1, t2 = timer(t1, t2)
     
     for i in range(1000):
-        c.four_point_transform(c.frame, corners)
+        try:
+            corners = corners.tolist()
+        except Exception:
+            pass
+        cornersNew = corners[::-1]
+        cornersNew = [
+            corners[2], corners[1], corners[0], corners[3]
+        ]
+        c.four_point_transform(c.frame, cornersNew)
         beacons = c.getBeacons()
         r.setBeacons(beacons)
         if len(beacons) == 3:
@@ -111,7 +119,15 @@ def main():
         c.updateFrame()
         #print("updated frame")
         t1, t2 = timer(t1, t2)
-        c.four_point_transform(c.frame, corners)
+        try:
+            corners = corners.tolist()
+        except Exception:
+            pass
+        cornersNew = corners[::-1]
+        cornersNew = [
+            corners[2], corners[1], corners[0], corners[3]
+        ]
+        c.four_point_transform(c.frame, cornersNew)
         #print("transform")
         t1, t2 = timer(t1, t2)
         cv2.circle(c.arena, (300,300), radius=0, color=(0, 0, 255), thickness=5)
@@ -146,14 +162,16 @@ def main():
             ]
             cv2.circle(c.arena, front, radius=0, color=(0,0,255), thickness=5)
             cv2.circle(c.arena, back, radius=0, color=(0,255,0), thickness=5)
-            if time.time() - r.lastCommandTime > 0.3 and 0:
+            if time.time() - r.lastCommandTime > 0.15:
                 print("calculating pos")
                 r.computeMotors(front[0], front[1], back[0], back[1])
                 print("computed motors")
                 t1, t2 = timer(t1, t2)
+            else:
+                print("skipped")
         else:
             if framesLost < 10:
-                if time.time() - r.lastCommandTime > 0.3:
+                if time.time() - r.lastCommandTime > 0.15:
                     r.commands.append("+000+000")
                     r.lastCommandTime = time.time()
                 framesLost+=1
@@ -182,6 +200,7 @@ def main():
         if keya == 115:
             r.commands.append("start")
             r.lastCommandTime = time.time()
+            print("start")
 
 
 if __name__ == "__main__":
