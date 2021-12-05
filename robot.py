@@ -12,10 +12,10 @@ class Robot:
         self.commands = []
         self.beacons = []
         self.dropOffLocations = {
-            "1": (80, 520),
-            "2": (450, 200),
-            "3": (400, 150),
-            "0": (565, 45)
+            "1": (80, 520),  # location of first drop off location
+            "2": (450, 200),  # location of second drop off location
+            "3": (400, 150),  # location of third drop off location
+            "0": (565, 45)  # location of final resting place of robot
         }
         self.returning = False
         self.beaconID = None
@@ -31,69 +31,70 @@ class Robot:
         #self.bts.listen()
         self.ips.listen()
 
-        atexit.register(self.ips.close)
+        atexit.register(self.ips.close)  # ensure that any exiting of the program performs a socket teardown.
         
         self.t = threading.Thread(target=self.IPDaemon, daemon=True)
         self.t.start()
+        # create and start the ip daemon
 
-        self.commands = []
+        self.commands = []  # buffered commands
 
         self.lastCommandTime = 0
 
     def IPDaemon(self):
         """Daemon to send buffered commands to the robot"""
         while True:
-            conn, addr = self.ips.accept()
-            self.commands = []
+            conn, addr = self.ips.accept()  # accept a new connection
+            self.commands = []  # clear any pending commands
             with conn:
                 d = conn.recv(1024)  # should be b'test'
                 print(d)
                 while True:
                     if self.commands != []:
-                        conn.sendall(self.commands.pop(0).encode("utf-8"))
+                        conn.sendall(self.commands.pop(0).encode("utf-8"))  # send any commands
                     time.sleep(0.001)
 
     def computeMotors(self, x1, y1, x2, y2):
         """Given the location of the front and back of the arUco code, calculate what the motors should be doing"""
         xa = (x1 + x2) / 2
         ya = (y1 + y2) / 2
-        position = (xa, ya)
+        # calculate center of arUco code
+
         print("computing motors")
         print(f"beacons: {self.beacons}")
         i = 0
         for j, beacon in enumerate(self.beacons):
             if abs(sum(beacon) - 600) < 40:
                 i = j
-        if i == len(self.beacons):
-            print("all beacons on other side")
-            return
+                # try to select beacon on main line if present
+        
 
-        orientation = [y2 - y1, x2 - x1]
-        reversing = False
+        orientation = [y2 - y1, x2 - x1]  # calculate orientation of robot
+        reversing = False  # reset reversing
 
-        if self.returning:
+        if self.returning:  # simplified as grabber is not functional
             reversing = True
-            instrumentalDestination, finalDestination = (175,425), (175,425)
+            instrumentalDestination, finalDestination = (175,425), (175,425)  # waypoint on current side of ramp
             print(instrumentalDestination)
         elif len(self.beacons) == 0:
-            finalDestination = self.dropOffLocations["0"]
+            finalDestination = self.dropOffLocations["0"]  # go to the final resting place
             print(f"final destination: {finalDestination}")
             print(xa, ya)
-            if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa < 220:
+            if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa < 220:  # checkpoint for being on the ramp
                 instrumentalDestination = (175,425)
-            elif xa - ya > 0:
+            elif xa - ya > 0:  # is the robot on the wrong side of the barriers
                 instrumentalDestination = (425,175)
             else:
                 instrumentalDestination = finalDestination
             print(instrumentalDestination)
         else:
-            finalDestination = self.beacons[i]
+            finalDestination = self.beacons[i]  # go to the next beacon
             print(f"final destination: {finalDestination}")
             print(xa, ya)
-            if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa < 220:
+            if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa < 220:  # if on the ramp exit the ramp on the right side
                 instrumentalDestination = (175,425)
             elif xa - ya > 0:
-                instrumentalDestination = (425,175)
+                instrumentalDestination = (425,175)  # if on the wrong side of the ramp go to the ramp entrance
             else:
                 instrumentalDestination = finalDestination
             print(instrumentalDestination)
@@ -103,40 +104,46 @@ class Robot:
 
             
         print(f"orientation: {orientation}")
-        direction = [ya - instrumentalDestination[1], xa - instrumentalDestination[0]]
+        direction = [ya - instrumentalDestination[1], xa - instrumentalDestination[0]]  # vector from robot to instrumental destination
         print(f"direction: {direction}")
 
-        directionToFinal = [ya - finalDestination[1], xa - finalDestination[0]]
+        directionToFinal = [ya - finalDestination[1], xa - finalDestination[0]]  # vector from robot to final destination
 
-        distance = (directionToFinal[0]**2 + directionToFinal[1]**2)**0.5
+        distance = (directionToFinal[0]**2 + directionToFinal[1]**2)**0.5  # distance to final destination
 
-        if distance < 95 and not self.returning:
+        if distance < 95 and not self.returning:  # is the robot close to a beacon it is targeting
             print("begun approach")
             self.commands.append("approach")
             self.lastCommandTime = time.time()
             self.beacons.pop(i)
             self.returning = True
             return
-        elif distance < 50:
+        elif distance < 50:  # has the robot reached it's final resting place
             self.returning = False
             if len(self.beacons) == 0:
                 self.commands.append("+000+000")
                 exit()
             return
 
-        error = math.atan2(*direction) - math.atan2(*orientation)
+        error = math.atan2(*direction) - math.atan2(*orientation)  # error from desired direction
         print(error)
+
         lPower = 255 + error*500
         rPower = 255 - error*500
+        # calculate ideal motor powers
+
         maxPower = max(abs(lPower), abs(rPower))
         lPower /= maxPower/255
         rPower /= maxPower/255
         lPower = int(lPower)
         rPower = int(rPower)
+        # normalize motors to a max of 255
+
         if reversing:
-            lPower, rPower = -rPower, -lPower
+            lPower, rPower = -rPower, -lPower  # reverse direction robot travels
+
         print(lPower, rPower)
-        self.commands.append(f"{lPower:+04}{rPower:+04}")
+        self.commands.append(f"{lPower:+04}{rPower:+04}")  # send command
         self.lastCommandTime = time.time()
 
 

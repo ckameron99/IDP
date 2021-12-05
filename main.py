@@ -37,7 +37,7 @@ def lineIntersection(l1, l2):
     m1 = gradient(l1)
     m2 = gradient(l2)
 
-    # calculate the intercepts
+    # calculate the intercepts with the y axis
     c1 = l1[1] - m1 * l1[0]
     c2 = l2[1] - m2 * l2[0]
 
@@ -49,115 +49,133 @@ def lineIntersection(l1, l2):
 
     return np.array([int(xi), int(yi)])
 
-def timer(t1, t2):
-    """Use for measuring time differences"""
-    t=time.time()
-    #print(t-t2)
-    return t2, t
 
 def main():
     """Main program loop."""
-    t1, t2 = time.time(), time.time()
     r = Robot()
     r.connect("192.168.137.1", 8081)
+    # create and connect robot instance
 
 
     c = Camera()
     c.connect()
-    #print("initializing")
-    t1, t2 = timer(t1, t2)
+    # create and connect camera instance
+    
     c.updateFrame()
     #cv2.setMouseCallback('normal',c.mouseRGB)
+
     arucoDict = aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
     arucoParams = aruco.DetectorParameters_create()
-    c.stream.set(cv2.CAP_PROP_BUFFERSIZE, 3)
+    # set up the arUco code dictionary and parameters for later recognition
+
+    c.stream.set(cv2.CAP_PROP_BUFFERSIZE, 3)  # an attempt to reduce latency, redundant after frame daemon implemented.
     c.updateFrame()
+
     barrier = c.getBarrier()
     mainLine = c.getMainLine()
-    #print("got lines")
-    t1, t2 = timer(t1, t2)
+
     center = lineIntersection(barrier, mainLine)
-    corners = []
+    # calculate center of the arena
+    
     barrierDir = [barrier[2]-barrier[0], barrier[3]-barrier[1]]
     mainLineDir = [mainLine[2]-mainLine[0], mainLine[3]-mainLine[1]]
+    # calculate the direction the barrier and main line travel along
+
+    corners = []
     corners.append(center + genLine2(barrierDir, -350))
     corners.append(center + genLine2(mainLineDir, -350))
     corners.append(center + genLine2(barrierDir, 350))
     corners.append(center + genLine2(mainLineDir, 350))
     corners = np.array(corners)
+    # estimate the corners of the arena from the directions and center
+    
     for i in range(10):
         c.updateFrame()
+
         barrier = c.getBarrier()
         mainLine = c.getMainLine()
+        # get the lines of the main line and barrier
+
         center = lineIntersection(barrier, mainLine)
-        oldCorners = corners.copy()
-        corners = []
+        # calculate the center of the arena
+
+        oldCorners = corners.copy() # store a copy of the current corner estimate
+
         barrierDir = [barrier[2]-barrier[0], barrier[3]-barrier[1]]
         mainLineDir = [mainLine[2]-mainLine[0], mainLine[3]-mainLine[1]]
+        # calculate the direction the main line and barrier point in
+
+        corners = []
         corners.append(center + genLine2(barrierDir, -350))
         corners.append(center + genLine2(mainLineDir, -350))
         corners.append(center + genLine2(barrierDir, 350))
         corners.append(center + genLine2(mainLineDir, 350))
         corners = np.array(corners)
+        # estimate the corners of the arena from the directions and center
+
         corners = 0.2*corners + 0.8*oldCorners
-        #print("got more lines")
-        t1, t2 = timer(t1, t2)
+        # perform a weighted avarage
     
     for i in range(1000):
         try:
             corners = corners.tolist()
         except Exception:
             pass
-        cornersNew = corners[::-1]
+        cornersNew = corners[::-1]  # reverse list
         cornersNew = [
             corners[2], corners[1], corners[0], corners[3]
         ]
+        # reorder list
+
         c.four_point_transform(c.frame, cornersNew)
+        # create cropped arena
+
         beacons = c.getBeacons()
         r.setBeacons(beacons)
+        # detect beacons in current frame and update robot's model
+
         if len(beacons) == 3:
-            break
+            break  # assume correct recognition to break
         if i == 1000:
             exit("failed to find beacons")
-    framesLost = 0
+
+    framesLost = 0  # used for relocation of robot if image recognition fails
     while True:
-        t1, t2 = timer(t1, t2)
         c.updateFrame()
-        #print("updated frame")
-        t1, t2 = timer(t1, t2)
         try:
             corners = corners.tolist()
         except Exception:
             pass
-        cornersNew = corners[::-1]
+        # corners may be either a list or ndarray. Make it a list
+        cornersNew = corners[::-1]  # reverse list
         cornersNew = [
             corners[2], corners[1], corners[0], corners[3]
         ]
+        # reorder list
+
         c.four_point_transform(c.frame, cornersNew)
-        #print("transform")
-        t1, t2 = timer(t1, t2)
+        # create cropped arena frame
+
         cv2.circle(c.arena, (300,300), radius=0, color=(0, 0, 255), thickness=5)
         cv2.circle(c.arena, (200,400), radius=0, color=(0, 0, 255), thickness=5)
-        
-        #print("found beacons")
-        t1, t2 = timer(t1, t2)
+        cv2.circle(c.arena, (400,200), radius=0, color=(0, 0, 255), thickness=5)
+        # plot some circles at key points in arena to ensure correct transform
+
         for beacon in beacons:
             cv2.circle(c.arena, beacon, radius=0, color=(255, 0, 0), thickness=5)
-        
+        # plot beacons
 
         
         for corner in corners:
             corner = [int(e) for e in corner]
             cv2.circle(c.frame, corner, radius=0, color=(0,255,0), thickness=5)
-        #cv2.imshow("frame", c.frame)
-        #print(center)
-        #cv2.circle(c.frame, center, radius=0, color=(0,0,255), thickness=15)
-        grey = cv2.cvtColor(c.arena, cv2.COLOR_BGR2GRAY)
+        # plot the corners of the arena
+
         (rcorners, ids, rejected) = aruco.detectMarkers(c.arena[:,:,2], arucoDict, parameters=arucoParams)
-        #print("detected aruco")
-        t1, t2 = timer(t1, t2)
+        # detect the arUco markers
+
         if rcorners:
-            framesLost = 0
+            framesLost = 0  # reset the unrecognized frame counter
             front = [
                int((rcorners[0][0][0][0] + rcorners[0][0][1][0]) / 2),
                int((rcorners[0][0][0][1] + rcorners[0][0][1][1]) / 2)
@@ -166,13 +184,14 @@ def main():
                 int((rcorners[0][0][2][0] + rcorners[0][0][3][0]) / 2),
                 int((rcorners[0][0][2][1] + rcorners[0][0][3][1]) / 2)
             ]
+            # calculate the coordinates of the front and back of the arUco code
+
             cv2.circle(c.arena, front, radius=0, color=(0,0,255), thickness=5)
             cv2.circle(c.arena, back, radius=0, color=(0,255,0), thickness=5)
-            if time.time() - r.lastCommandTime > 0.15:
-                print("calculating pos")
-                r.computeMotors(front[0], front[1], back[0], back[1])
-                print("computed motors")
-                t1, t2 = timer(t1, t2)
+            # plot the front and back of the robot
+
+            if time.time() - r.lastCommandTime > 0.15:  # prevent overloading robot with commands
+                r.computeMotors(front[0], front[1], back[0], back[1])  # get the robot to move
             else:
                 print("skipped")
         else:
@@ -181,29 +200,37 @@ def main():
                     r.commands.append("+000+000")
                     r.lastCommandTime = time.time()
                 framesLost+=1
+                # if the robot is recently lost, stop it from moving
             else:
                 print("nudge")
                 r.commands.append("+250+250")
                 r.lastCommandTime = time.time()
                 framesLost = 0
+                # if the robot has been lost for a while, nudge it forwards a little to see if the lighting changes
         
         
         cv2.line(c.normalized,barrier[:2],barrier[2:],(255,0,0),5)
         cv2.line(c.normalized,mainLine[:2],mainLine[2:],(255,0,0),5)
-        #cv2.imshow("frame", c.frame)
+        # plot the barrier and main line over the normalized view
+        
         cv2.imshow("normal", c.normalized)
         cv2.imshow("arena", c.arena)
-        #cv2.imshow("original", c.stream.retrieve()[1])
+        # display the normalized view and arena view
+
         cv2.setMouseCallback("arena", c.mouseHSV)
         cv2.setMouseCallback("normal", c.mouseRGB)
+        # add mouse callback events for debugging
+
         keya = cv2.waitKey(1)
-        if keya == 27:
+        # render a frame and listen for a keypress
+
+        if keya == 27:  # 'Esc' key
             r.commands.append("stop")
             r.lastCommandTime = time.time()
             cv2.destroyAllWindows()
             time.sleep(1)
             exit()
-        if keya == 115:
+        if keya == 115:  # 's' key
             r.commands.append("start")
             r.lastCommandTime = time.time()
             print("start")
