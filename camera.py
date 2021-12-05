@@ -5,8 +5,9 @@ import time
 
 
 class Camera:
+    """A class to contain properties and functions related to the camera and it's stream"""
     def __init__(self):
-        # Versions of frames are stored as a frame, followed by a number showing what frame it was derived from
+        """Initializes the camera class, including serveral placeholders for transformed frames"""
         self.stream = None
         self._frame = None, 0
         self._normalized = None, -1
@@ -27,6 +28,7 @@ class Camera:
         self.t = threading.Thread(target=self.frameDaemon, daemon=True)
 
     def frameDaemon(self):
+        """Daemon to clear the frame buffer and stores the latest frame"""
         while True:
             time.sleep(0.0001)
             ret = self.stream.grab()
@@ -35,11 +37,13 @@ class Camera:
                 self.latestFrame = frame
 
     def connect(self, url="http://localhost:8082/stream/video.mjpeg"):
+        """Starts the stream and the frame buffer daemon"""
         self.stream = cv2.VideoCapture(url)
         self.t.start()
         time.sleep(1)
 
     def mouseRGB(self,event,x,y,flags,param):
+        """Callback event for clicking on an RGB display"""
         if event == cv2.EVENT_LBUTTONDOWN: #checks mouse left button down condition
             colorsB = self._normalized[0][y,x,0]
             colorsG = self._normalized[0][y,x,1]
@@ -54,6 +58,7 @@ class Camera:
             print("Coordinates of pixel: X: ",x,"Y: ",y)
 
     def mouseHSV(self,event,x,y,flags,param):
+        """Callback event for clicking on an HSV display"""
         if event == cv2.EVENT_LBUTTONDOWN: #checks mouse left button down condition
             colorsH = self.hsvArena[y,x,0]
             colorsS = self.hsvArena[y,x,1]
@@ -67,14 +72,11 @@ class Camera:
 
     @property
     def frame(self):
+        """Getter method for the frame property"""
         return self._frame[0]
 
     def updateFrame(self):
-        '''ret = True
-        while ret:
-            ret = self.stream.grab()
-        ret, frame = self.stream.retrieve()
-        print("newframe")'''
+        """Updates the frame from the latest frame from stream daemon"""
         frame = self.latestFrame.copy()
         h,  w = frame.shape[:2]
         newcameramtx, roi = cv2.getOptimalNewCameraMatrix(self.mtx, self.dist, (w,h), 1, (w,h))
@@ -86,10 +88,12 @@ class Camera:
 
     @frame.setter
     def frame(self, value):
+        """Setter method for the frame property. Does NOT update the frame number"""
         self._frame[0] = value
 
     @property
     def hsv(self):
+        """Getter method for the HSV property. TODO: use @cached_property"""
         if self._hsv[1] == self._frame[1]:
             return self._hsv[0]
         self._hsv = cv2.cvtColor(self.frame, cv2.COLOR_BGR2HSV), self._frame[1]
@@ -97,6 +101,7 @@ class Camera:
 
     @property
     def ycrcb(self):
+        """Getter method for the ycrcb property. TODO: use @cached_property"""
         if self._ycrcb[1] == self._frame[1]:
             return self._ycrcb[0]
         self._ycrcb = cv2.cvtColor(self.frame, cv2.COLOR_BGR2YCrCb), self._frame[1]
@@ -104,6 +109,9 @@ class Camera:
 
     @property
     def ycrcbNormalized(self):
+        """Getter method for the ycrcbNormalized property.
+        Normalization pulls the avarage of local areas to a brightness of 100.
+        TODO: use @cached_property"""
         hh, ww = self.frame.shape[:2]
         if self._normalized[1] == self._frame[1]:
             return self._normalized[0]
@@ -129,6 +137,7 @@ class Camera:
 
     @property
     def normalized(self):
+        """Getter method for the normalized property"""
         hh, ww = self.frame.shape[:2]
         if self._normalized[1] == self._frame[1]:
             return self._normalized[0]
@@ -139,9 +148,12 @@ class Camera:
 
     @normalized.setter
     def normalized(self, value):
+        """Setter method for the normalized property"""
         self._normalized = value
 
     def four_point_transform(self, image, pts):
+        """Given and image and the verticies of a quaderalateral, sets the arena
+        property to a square frame containing the same area as the quaderalateral."""
         # obtain a consistent order of the points and unpack them
         # individually
         pts = np.array(pts, dtype="float32")
@@ -183,16 +195,19 @@ class Camera:
 
     @property
     def arena(self):
+        """Getter method for the arena property"""
         return self._arena[0]
 
     @property
     def hsvArena(self):
+        """Getter method for the hsvArena property. TODO: use @cached_property."""
         if self._hsvArena[1] == self._arena[1]:
             return self._hsvArena[0]
         self._hsvArena = cv2.cvtColor(self.arena, cv2.COLOR_BGR2HSV), self._arena[1]
         return self._hsvArena[0]
 
     def getBeacons(self):
+        """Returns a list of the beacons."""
         lower = np.uint8([34, 25, 175])
         upper = np.uint8([70, 85, 255])
         mask = cv2.inRange(self.hsvArena, lower, upper)
@@ -223,12 +238,12 @@ class Camera:
         except ValueError:
             return []
 
-        #cv2.imshow("mask", mask)
-
     def getBarrier(self):
+        """Allows for either using an HSV mask or ycrcb mask"""
         return self.getBarrierhsv()
 
     def getBarrierhsv(self):
+        """Returns the points defining the barrier. Uses an HSV mask"""
         lower = np.uint8([25, 50, 200])
         upper = np.uint8([35, 180, 255])
         yellowMask = cv2.inRange(self.hsv, lower, upper)
@@ -261,6 +276,7 @@ class Camera:
         return x1Max, y1Max, x2Min, y2Min
     
     def getBarrierycrcb(self):
+        """Returns the points defining the barrierr. Uses a ycrcb mask."""
         # no longer in use
         lower = np.uint8([130, 125, 35])
         upper = np.uint8([255, 145, 120])
@@ -294,6 +310,7 @@ class Camera:
         return x1Max, y1Max, x2Min, y2Min
             
     def getMainLine(self):
+        """Returns the coordinates of the ends of the main white line"""
         lower = np.uint8([150, 125, 125])
         upper = np.uint8([255, 135, 135])
         whiteMask = cv2.inRange(self.ycrcbNormalized, lower, upper)

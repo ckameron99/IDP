@@ -6,7 +6,9 @@ import atexit
 
 
 class Robot:
+    """Class to contain methods and properties relating to the physical robot."""
     def __init__(self):
+        """Initializes the robot class"""
         self.commands = []
         self.beacons = []
         self.dropOffLocations = {
@@ -18,7 +20,8 @@ class Robot:
         self.returning = False
         self.beaconID = None
     
-    def connect(self, IPAddr, IPPort, MACAddr):
+    def connect(self, IPAddr, IPPort):
+        """Starts listening for the robot to connect, and begins a daemon to send commands. TODO: implement bluetooth."""
         #self.bts = socket.socket(socket.AF_BLUETOOTH, socket.SOCK_STREAM, socket.BTPROTO_RFCOMM)
         self.ips = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -38,6 +41,7 @@ class Robot:
         self.lastCommandTime = 0
 
     def IPDaemon(self):
+        """Daemon to send buffered commands to the robot"""
         while True:
             conn, addr = self.ips.accept()
             self.commands = []
@@ -50,6 +54,7 @@ class Robot:
                     time.sleep(0.001)
 
     def computeMotors(self, x1, y1, x2, y2):
+        """Given the location of the front and back of the arUco code, calculate what the motors should be doing"""
         xa = (x1 + x2) / 2
         ya = (y1 + y2) / 2
         position = (xa, ya)
@@ -72,7 +77,7 @@ class Robot:
             print(instrumentalDestination)
         elif len(self.beacons) == 0:
             finalDestination = self.dropOffLocations["0"]
-            print(f"final desination: {finalDestination}")
+            print(f"final destination: {finalDestination}")
             print(xa, ya)
             if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa < 220:
                 instrumentalDestination = (175,425)
@@ -83,7 +88,7 @@ class Robot:
             print(instrumentalDestination)
         else:
             finalDestination = self.beacons[i]
-            print(f"final desination: {finalDestination}")
+            print(f"final destination: {finalDestination}")
             print(xa, ya)
             if ((xa-300)**2 + (ya-300)**2)**0.5 < 220 and abs(xa+ya-600)<40 and ya - xa < 220:
                 instrumentalDestination = (175,425)
@@ -136,6 +141,7 @@ class Robot:
 
 
     def setBeacons(self, beacons):
+        """Update the internal location of the beacons if a simple heuristic favours the new list"""
         if len(beacons) >= len(self.beacons) and len(beacons) <= 3:
             self.beacons = beacons
 

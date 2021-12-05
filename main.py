@@ -10,24 +10,28 @@ import time
 
 
 def gradient(l1):
+    """Returns the gradient of a line in the form of the coordinates of each end"""
     if l1[2] == l1[0]:
         return 1
     m1 = (l1[3] - l1[1]) / (l1[2] - l1[0])
     return m1
 
 def genLine(m, r):
+    """Generate a line segment from the gradient and the length"""
     theta = math.atan2(1, m)
     x = r * math.cos(theta)
     y = r * math.sin(theta)
     return np.array([int(x), int(y)])
 
 def genLine2(dir, r):
+    """Generate a line segment from a direction and length"""
     theta = math.atan2(dir[1], dir[0])
     x = r * math.cos(theta)
     y = r * math.sin(theta)
     return np.array([int(x), int(y)])
 
 def lineIntersection(l1, l2):
+    """Calculate the location of the intersection of two lines."""
     # lines should be given in the format x1, y1, x2, y2
     # calculate the gradients
     m1 = gradient(l1)
@@ -46,14 +50,16 @@ def lineIntersection(l1, l2):
     return np.array([int(xi), int(yi)])
 
 def timer(t1, t2):
+    """Use for measuring time differences"""
     t=time.time()
     #print(t-t2)
     return t2, t
 
 def main():
+    """Main program loop."""
     t1, t2 = time.time(), time.time()
     r = Robot()
-    r.connect("192.168.137.1", 8081, "A8-7E-EA-C7-E7-27")
+    r.connect("192.168.137.1", 8081)
 
 
     c = Camera()
