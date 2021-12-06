@@ -299,11 +299,11 @@ void approach() {
 }
 
 void loop() {
-  char spd[100] = {0};
-  char s1[30] = {0};
-  char s2[30] = {0};
-  int spd1;
-  int spd2;
+  char spd[100] = {0};  // string command
+  char s1[30] = {0}; // string of speed 1
+  char s2[30] = {0};  // string of speed 2
+  int spd1;  // int of speed 1
+  int spd2;  // int of speed 2
   int i = 0;
   int error;
   int distance;
